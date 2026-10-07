@@ -1,0 +1,6 @@
+{
+  "name": "NeuroHand AR - Stroke Motor Rehabilitation",
+  "description": "Augmented reality upper-limb rehabilitation platform for stroke recovery, tracking hand and finger mobility, range of motion, and fine motor dexterity with real-time biofeedback and therapist monitoring.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
