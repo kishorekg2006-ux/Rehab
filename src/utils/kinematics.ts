@@ -48,6 +48,69 @@ export function computeAngleDegrees(a: LandmarkPoint, b: LandmarkPoint, c: Landm
   const cos = Math.max(-1, Math.min(1, dot / (mag1 * mag2)));
   return (Math.acos(cos) * 180) / Math.PI;
 }
+ 
+/**
+ * Accurately determines physical hand (left vs right) considering:
+ * 1. MediaPipe multiHandedness label
+ * 2. Mirror mode (selfie camera front-facing vs rear camera)
+ * 3. 3D Anatomical orientation of the palm (wrist -> middle MCP, index MCP -> pinky MCP)
+ * 4. User calibration inversion toggle
+ */
+export function determinePhysicalHand(
+  mediaPipeLabel?: 'Left' | 'Right' | string,
+  landmarks?: HandLandmarks | null,
+  isMirrored: boolean = true,
+  invertChirality: boolean = false
+): 'left' | 'right' {
+  let result: 'left' | 'right' = 'right';
+
+  if (mediaPipeLabel) {
+    const labelUpper = mediaPipeLabel.toUpperCase();
+    // In front-facing selfie camera (standard webcam), MediaPipe's unmirrored image
+    // has a physical RIGHT hand appear on the observer's left, so MediaPipe returns 'Left'.
+    // When isMirrored is true (standard selfie view), MediaPipe 'Left' is the user's real RIGHT hand.
+    if (isMirrored) {
+      result = labelUpper === 'LEFT' ? 'right' : 'left';
+    } else {
+      result = labelUpper === 'LEFT' ? 'left' : 'right';
+    }
+  } else if (landmarks && landmarks.length >= 21) {
+    // Robust anatomical calculation:
+    // Normal vector to the palm using cross product
+    const wrist = landmarks[LM.WRIST];
+    const indexMcp = landmarks[LM.INDEX_MCP];
+    const middleMcp = landmarks[LM.MIDDLE_MCP];
+    const pinkyMcp = landmarks[LM.PINKY_MCP];
+    const thumbTip = landmarks[LM.THUMB_TIP];
+
+    // Longitudinal vector: Wrist -> Middle MCP
+    const lx = middleMcp.x - wrist.x;
+    const ly = middleMcp.y - wrist.y;
+
+    // Transversal vector: Pinky MCP -> Index MCP
+    const tx = indexMcp.x - pinkyMcp.x;
+    const ty = indexMcp.y - pinkyMcp.y;
+
+    // 2D Cross product (lx * ty - ly * tx) reveals palm normal z-orientation
+    // Positive indicates palm facing camera; negative indicates back of hand facing camera
+    const isPalmFacingCamera = (lx * ty - ly * tx) > 0;
+
+    // Relative position of thumb to index
+    const isThumbToLeftOfIndex = thumbTip.x < indexMcp.x;
+
+    if (isPalmFacingCamera) {
+      result = isThumbToLeftOfIndex ? 'right' : 'left';
+    } else {
+      result = isThumbToLeftOfIndex ? 'left' : 'right';
+    }
+  }
+
+  if (invertChirality) {
+    result = result === 'right' ? 'left' : 'right';
+  }
+
+  return result;
+}
 
 export class KinematicsProcessor {
   private positionHistory: { x: number; y: number; time: number }[] = [];
@@ -59,7 +122,11 @@ export class KinematicsProcessor {
     this.pinchHoldStart = null;
   }
 
-  public processHand(landmarks: HandLandmarks, now: number = performance.now()): HandMetrics {
+  public processHand(
+    landmarks: HandLandmarks,
+    now: number = performance.now(),
+    explicitHand?: 'left' | 'right' | null
+  ): HandMetrics {
     if (!landmarks || landmarks.length < 21) {
       return this.getEmptyMetrics();
     }
@@ -166,8 +233,13 @@ export class KinematicsProcessor {
       }
     }
 
-    // Detected hand (based on thumb relative to pinky when palm faces camera)
-    const detectedHand: 'left' | 'right' = thumbTip.x > landmarks[LM.PINKY_TIP].x ? 'left' : 'right';
+    // Determine physical hand (prioritize explicit hand passed from MediaPipe handedness analysis)
+    let detectedHand: 'left' | 'right' = 'right';
+    if (explicitHand) {
+      detectedHand = explicitHand;
+    } else {
+      detectedHand = determinePhysicalHand(undefined, landmarks, true);
+    }
 
     return {
       pinchAperture,

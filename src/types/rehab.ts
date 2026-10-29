@@ -30,12 +30,35 @@ export interface HandMetrics {
   detectedHand: 'left' | 'right' | null;
 }
 
-export type ExerciseId = 'pinch_harvest' | 'finger_isolation' | 'lotus_bloom' | 'wrist_glider';
+export type ExerciseId = 'fruit_catcher' | 'pinch_harvest' | 'finger_isolation' | 'lotus_bloom' | 'wrist_glider';
+
+export type FruitColorTheme = 'all' | 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'purple';
+
+export interface FallingFruit {
+  id: number;
+  x: number; // 0-1
+  y: number; // 0-1
+  speed: number;
+  colorName: string;
+  themeColor: FruitColorTheme;
+  hex: string;
+  glowColor: string;
+  name: string;
+  emoji: string;
+  size: number;
+  caught: boolean;
+}
 
 export interface ExerciseDefinition {
   id: ExerciseId;
   name: string;
-  category: 'Fine Motor & Pinch' | 'Finger Isolation & Dexterity' | 'Extensor Tone & Spasticity' | 'Wrist Stability & ROM';
+  category:
+    | 'Gross Grasp & Hand Coordination'
+    | 'Fine Motor & Pinch'
+    | 'Finger Isolation & Dexterity'
+    | 'Extensor Tone & Spasticity'
+    | 'Wrist Stability & ROM'
+    | 'Spatial Reach & Upper Limb Extension';
   clinicalGoal: string;
   description: string;
   instructions: string[];
@@ -74,6 +97,8 @@ export interface SessionRecord {
 export interface PatientProfile {
   id: string;
   fullName: string;
+  phoneNumber?: string;
+  condition?: string; // Type of disease / disorder / case
   affectedSide: 'left' | 'right';
   strokeDate?: string;
   brunnstromStage: 2 | 3 | 4 | 5 | 6; // Clinical stroke recovery stage
@@ -89,20 +114,3 @@ export interface PatientProfile {
   therapistNotes: string;
 }
 
-export interface ClinicalSOAPReport {
-  generatedAt: string;
-  patientName: string;
-  affectedSide: 'left' | 'right';
-  subjectiveSummary: string;
-  objectiveMetrics: {
-    totalSessions: number;
-    complianceRatePercent: number;
-    baselineVsCurrentExtensionDeg: { baseline: number; current: number; changeDeg: number };
-    pinchApertureControlMm: { baseline: number; current: number; improvementPercent: number };
-    tremorIndexTrend: { start: number; current: number; reductionPercent: number };
-    estimatedFuglMeyerUEScore: number; // Max 66 for upper extremity
-  };
-  assessmentAnalysis: string;
-  planRecommendations: string[];
-  clinicalSignOff: string;
-}
